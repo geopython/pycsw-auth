@@ -107,6 +107,8 @@ paths:
             responses:
                 '200':
                     $ref: '#/components/responses/Records'
+            tags:
+                - Records
         post:
             operationId: authPostRecord
             requestBody:
@@ -118,6 +120,8 @@ paths:
             responses:
                 '201':
                     description: successful creation
+            tags:
+                - Records
 
     '/auth/records/{recordId}':
         get:
@@ -131,6 +135,8 @@ paths:
             responses:
                 '200':
                     $ref: '#/components/responses/Record'
+            tags:
+                - Records
         put:
             operationId: authPutRecord
             parameters:
@@ -148,12 +154,16 @@ paths:
             responses:
                 '204':
                     description: successful update
+            tags:
+                - Records
     '/auth/scopes':
         get:
             operationId: authGetScopes
             responses:
                 '200':
                     $ref: '#/components/responses/Scopes'
+            tags:
+                - Scopes
         post:
             operationId: authPostScope
             requestBody:
@@ -165,6 +175,8 @@ paths:
             responses:
                 '201':
                     description: successful creation
+            tags:
+                - Scopes
     '/auth/scopes{scopeId}':
         get:
             operationId: authGetScope
@@ -177,6 +189,8 @@ paths:
             responses:
                 '200':
                     $ref: '#/components/responses/Scope'
+            tags:
+                - Scopes
         put:
             operationId: authPutScope
             parameters:
@@ -194,3 +208,8 @@ paths:
             responses:
                 '204':
                     description: successful update
+            tags:
+                - Scopes
+tags:
+    - name: Records
+    - name: Scopes
