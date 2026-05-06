@@ -156,6 +156,19 @@ paths:
                     description: successful update
             tags:
                 - Records
+        delete:
+            operationId: authDeleteRecord
+            parameters:
+                - name: recordId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '204':
+                    description: successful deletion
+            tags:
+                - Records
     '/auth/scopes':
         get:
             operationId: authGetScopes
@@ -177,7 +190,7 @@ paths:
                     description: successful creation
             tags:
                 - Scopes
-    '/auth/scopes{scopeId}':
+    '/auth/scopes/{scopeId}':
         get:
             operationId: authGetScope
             parameters:
@@ -208,6 +221,19 @@ paths:
             responses:
                 '204':
                     description: successful update
+            tags:
+                - Scopes
+        delete:
+            operationId: authDeleteScope
+            parameters:
+                - name: scopeId
+                  in: path
+                  required: true
+                  schema:
+                      type: string
+            responses:
+                '204':
+                    description: successful deletion
             tags:
                 - Scopes
 tags:

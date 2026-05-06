@@ -33,17 +33,18 @@ from sqlalchemy import Boolean, Column, ForeignKey, String, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
-Base = declarative_base()
+BASE = declarative_base()
 
 
-class Record(Base):
+class Record(BASE):
     __tablename__ = 'records'
 
     identifier = Column(String, primary_key=True)
-    scopes = relationship('Scope', back_populates='record')
+    scopes = relationship('Scope', back_populates='record',
+                          cascade='all, delete-orphan')
 
 
-class Scope(Base):
+class Scope(BASE):
     __tablename__ = 'scopes'
 
     identifier = Column(String, primary_key=True)
@@ -53,11 +54,12 @@ class Scope(Base):
     can_update = Column(Boolean, nullable=False, default=False)
     can_delete = Column(Boolean, nullable=False, default=False)
 
-    record_identifier = Column(String, ForeignKey('records.identifier'))
+    record_identifier = Column(String, ForeignKey('records.identifier',
+                               ondelete='CASCADE'))
 
     record = relationship('Record', back_populates='scopes')
 
 
 if __name__ == '__main__':
     engine = create_engine(os.environ.get('SQLALCHEMY_DATABASE_URI'))
-    Base.metadata.create_all(engine)
+    BASE.metadata.create_all(engine)

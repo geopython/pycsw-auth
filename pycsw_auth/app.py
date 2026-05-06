@@ -107,6 +107,8 @@ def scopes():
         if data is None or not data:
             abort(400, 'Empty payload')
 
+        response = _create_scope(session, data)
+
         return '', 201
 
 
@@ -129,6 +131,9 @@ def scope(identifier):
 
         response = _update_scope(session, identifier, data)
 
+        return '', 204
+    elif request.method == 'DELETE':
+        response = _delete_scope(session, identifier)
         return '', 204
 
 
@@ -205,8 +210,13 @@ def _get_scope(session, identifier):
 
 def _create_scope(session, data):
 
-    record = Record(identifier=data.get('record_identifier'))
-    session.add(record)
+    record_identifier = data.get('record_identifier')
+    record = session.query(Record).filter_by(
+                 identifier=record_identifier).first()
+
+    if not record:
+        record = Record(identifier=record_identifier)
+        session.add(record)
 
     scope = Scope(
         identifier=data.get('identifier'),
@@ -226,6 +236,14 @@ def _create_scope(session, data):
 def _update_scope(session, identifier, data):
 
     session.query(Scope).filter_by(identifier=identifier).update(**data)
+
+    session.commit()
+    session.close()
+
+
+def _delete_scope(session, identifier):
+
+    session.query(Scope).filter_by(identifier=identifier).delete()
 
     session.commit()
     session.close()
