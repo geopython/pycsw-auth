@@ -27,13 +27,14 @@
 #
 ###################################################################
 
+from copy import deepcopy
 import logging
 import os
 
 from flask import Flask, abort, jsonify, request
 from pycsw.wsgi_flask import BLUEPRINT as pycsw_blueprint
+from pycsw.ogc.api.util import render_j2_template, yaml_load
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 from pycsw_auth.models import Record, Scope
@@ -41,37 +42,49 @@ from pycsw_auth.models import Record, Scope
 LOGGER = logging.getLogger(__name__)
 MEDIA_TYPE = 'application/json'
 
-Base = declarative_base()
+APP = Flask(__name__, static_url_path='/static')
+APP.url_map.strict_slashes = False
+APP.register_blueprint(pycsw_blueprint, url_prefix='/')
 
-app = Flask(__name__, static_url_path='/static')
-app.url_map.strict_slashes = False
-app.register_blueprint(pycsw_blueprint, url_prefix='/')
+ENGINE = create_engine(os.environ.get('SQLALCHEMY_DATABASE_URI'))
+SESSION = sessionmaker(bind=ENGINE)
 
-engine = create_engine(os.environ.get('SQLALCHEMY_DATABASE_URI'))
-Session = sessionmaker(bind=engine)
-
+with open(os.environ.get('PYCSW_AUTH_OPENAPI')) as fh:
+    OPENAPI_DOCUMENT = yaml_load(fh)
 
 try:
     from flask_cors import CORS
-    CORS(app)
+    CORS(APP)
 except ImportError:  # CORS needs to be handled by upstream server
     pass
 
 
-@app.route('/records')
+@APP.route('/auth/openapi')
+def openapi():
+
+    if request.accept_mimetypes.best == 'application/json':
+        return jsonify(OPENAPI_DOCUMENT)
+    else:
+        pycsw_blueprint_config = deepcopy(pycsw_blueprint.config)
+        pycsw_blueprint_config['server']['url'] = os.environ.get('PYCSW_AUTH_URL')  # noqa
+        return render_j2_template(
+            pycsw_blueprint_config, 'openapi.html', OPENAPI_DOCUMENT)
+
+
+@APP.route('/auth/records')
 def records():
 
-    session = Session()
+    session = SESSION()
 
     response = get_records(session)
 
     return jsonify(response)
 
 
-@app.route('/records/<identifier>')
+@APP.route('/auth/records/<identifier>')
 def record(identifier):
 
-    session = Session()
+    session = SESSION()
 
     response = get_record(session, identifier)
     if response is None:
@@ -81,10 +94,10 @@ def record(identifier):
         return jsonify(response)
 
 
-@app.route('/scopes', methods=['GET', 'POST'])
+@APP.route('/auth/scopes', methods=['GET', 'POST'])
 def scopes():
 
-    session = Session()
+    session = SESSION()
 
     if request.method == 'GET':
         response = _get_scopes(session)
@@ -97,10 +110,10 @@ def scopes():
         return '', 201
 
 
-@app.route('/scopes/<identifier>', methods=['GET', 'PUT', 'DELETE'])
+@APP.route('/auth/scopes/<identifier>', methods=['GET', 'PUT', 'DELETE'])
 def scope(identifier):
 
-    session = Session()
+    session = SESSION()
 
     response = _get_scope(session, identifier)
 
