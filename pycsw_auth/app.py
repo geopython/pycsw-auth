@@ -27,25 +27,28 @@
 #
 ###################################################################
 
-from flask import Flask, jsonify
-from flask_sqlalchemy import SQLAlchemy
+import logging
+import os
+
+from flask import Flask, abort, jsonify, request
 from pycsw.wsgi_flask import BLUEPRINT as pycsw_blueprint
+from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-#from models import Scope
+from pycsw_auth.models import Record, Scope
 
+LOGGER = logging.getLogger(__name__)
 MEDIA_TYPE = 'application/json'
 
 Base = declarative_base()
-db = SQLAlchemy(model_class=Base)
 
 app = Flask(__name__, static_url_path='/static')
 app.url_map.strict_slashes = False
 app.register_blueprint(pycsw_blueprint, url_prefix='/')
 
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///project.db"
-
-db.init_app(app)
+engine = create_engine(os.environ.get('SQLALCHEMY_DATABASE_URI'))
+Session = sessionmaker(bind=engine)
 
 
 try:
@@ -55,7 +58,161 @@ except ImportError:  # CORS needs to be handled by upstream server
     pass
 
 
-@app.route('/scopes')
-def test():
+@app.route('/records')
+def records():
 
-    return jsonify({'name': 'tom'})
+    session = Session()
+
+    response = get_records(session)
+
+    return jsonify(response)
+
+
+@app.route('/records/<identifier>')
+def record(identifier):
+
+    session = Session()
+
+    response = get_record(session, identifier)
+    if response is None:
+        abort(404, 'Record not found')
+
+    if request.method == 'GET':
+        return jsonify(response)
+
+
+@app.route('/scopes', methods=['GET', 'POST'])
+def scopes():
+
+    session = Session()
+
+    if request.method == 'GET':
+        response = _get_scopes(session)
+        return jsonify(response)
+    elif request.method == 'POST':
+        data = request.get_json()
+        if data is None or not data:
+            abort(400, 'Empty payload')
+
+        return '', 201
+
+
+@app.route('/scopes/<identifier>', methods=['GET', 'PUT', 'DELETE'])
+def scope(identifier):
+
+    session = Session()
+
+    response = _get_scope(session, identifier)
+
+    if response is None:
+        abort(404, 'Record not found')
+
+    if request.method == 'GET':
+        return jsonify(response)
+    elif request.method == 'PUT':
+        data = request.get_json()
+        if data is None or not data:
+            abort(400, 'Empty payload')
+
+        response = _update_scope(session, identifier, data)
+
+        return '', 204
+
+
+def get_records(session):
+
+    response = {
+        'records': []
+    }
+
+    for record in session.query(Record).all():
+        response['records'].append({
+            'identifier': record.identifier,
+            'scopes': [scope.identifier for scope in record.scopes]
+        })
+
+    return response
+
+
+def get_record(session, identifier):
+
+    response = None
+
+    try:
+        record = session.query(Record).filter_by(identifier=identifier).one()
+        response = {
+            'identifier': record.identifier,
+            'scopes': [scope.identifier for scope in record.scopes]
+        }
+    except Exception as err:
+        LOGGER.debug(err)
+
+    return response
+
+
+def _get_scopes(session):
+    response = {
+        'scopes': []
+    }
+
+    for scope in session.query(Scope).all():
+        response['scopes'].append({
+            'identifier': scope.identifier,
+            'record_identifier': scope.record_identifier,
+            'can_read': scope.can_read,
+            'can_create': scope.can_create,
+            'can_replace': scope.can_replace,
+            'can_update': scope.can_update,
+            'can_delete': scope.can_delete
+        })
+
+    return response
+
+
+def _get_scope(session, identifier):
+
+    response = None
+
+    try:
+        scope = session.query(Scope).filter_by(identifier=identifier).one()
+        response = {
+            'identifier': scope.identifier,
+            'record_identifier': scope.record_identifier,
+            'can_read': scope.can_read,
+            'can_create': scope.can_create,
+            'can_replace': scope.can_replace,
+            'can_update': scope.can_update,
+            'can_delete': scope.can_delete
+        }
+    except Exception as err:
+        LOGGER.debug(err)
+
+    return response
+
+
+def _create_scope(session, data):
+
+    record = Record(identifier=data.get('record_identifier'))
+    session.add(record)
+
+    scope = Scope(
+        identifier=data.get('identifier'),
+        can_create=data.get('can_create'),
+        can_read=data.get('can_read'),
+        can_replace=data.get('can_replace'),
+        can_update=data.get('can_update'),
+        can_delete=data.get('can_delete'),
+        record=record
+    )
+
+    session.add(scope)
+    session.commit()
+    session.close()
+
+
+def _update_scope(session, identifier, data):
+
+    session.query(Scope).filter_by(identifier=identifier).update(**data)
+
+    session.commit()
+    session.close()

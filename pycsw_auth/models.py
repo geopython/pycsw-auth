@@ -29,20 +29,35 @@
 
 import os
 
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import create_engine
+from sqlalchemy import Boolean, Column, ForeignKey, String, create_engine
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
-from app import app, db
 Base = declarative_base()
 
-class Scope(db.Model):
-    __tablename__ = "scopes"
 
-    id = db.Column(db.Integer, primary_key=True)
+class Record(Base):
+    __tablename__ = 'records'
+
+    identifier = Column(String, primary_key=True)
+    scopes = relationship('Scope', back_populates='record')
+
+
+class Scope(Base):
+    __tablename__ = 'scopes'
+
+    identifier = Column(String, primary_key=True)
+    can_create = Column(Boolean, nullable=False, default=False)
+    can_read = Column(Boolean, nullable=False, default=False)
+    can_replace = Column(Boolean, nullable=False, default=False)
+    can_update = Column(Boolean, nullable=False, default=False)
+    can_delete = Column(Boolean, nullable=False, default=False)
+
+    record_identifier = Column(String, ForeignKey('records.identifier'))
+
+    record = relationship('Record', back_populates='scopes')
 
 
 if __name__ == '__main__':
-    with app.app_context():
-#        engine = create_engine(os.environ.get('SQLALCHEMY_DATABASE_URI'))
-        db.create_all
+    engine = create_engine(os.environ.get('SQLALCHEMY_DATABASE_URI'))
+    Base.metadata.create_all(engine)
